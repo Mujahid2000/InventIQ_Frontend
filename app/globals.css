@@ -24,3 +24,286 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes authFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes authGridDrift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(36px, 36px, 0);
+  }
+}
+
+@keyframes authShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes authFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes dashNavSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes dashPageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashStatRise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashGradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes productModalDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes orderItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes orderItemOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes restockPulseBadge {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.25);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 8px rgba(248, 113, 113, 0);
+  }
+}
+
+@keyframes restockCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes logEntrySlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes logEntryFlash {
+  0% {
+    background-color: rgba(34, 211, 238, 0.2);
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.auth-mesh-bg {
+  background-color: #0f1117;
+  background-image:
+    radial-gradient(circle at 14% 18%, rgba(99, 102, 241, 0.26), transparent 34%),
+    radial-gradient(circle at 82% 22%, rgba(6, 182, 212, 0.22), transparent 28%),
+    radial-gradient(circle at 64% 80%, rgba(79, 70, 229, 0.2), transparent 36%),
+    linear-gradient(155deg, #0b0e14 5%, #111827 52%, #0b1322 100%);
+}
+
+.auth-grid-pattern {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(circle at center, black 26%, transparent 86%);
+  opacity: 0.45;
+  animation: authGridDrift 18s linear infinite;
+}
+
+.auth-glass-card {
+  border-radius: 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(
+    145deg,
+    rgba(17, 24, 39, 0.72),
+    rgba(15, 23, 42, 0.5)
+  );
+  backdrop-filter: blur(22px);
+  box-shadow:
+    0 20px 48px rgba(3, 7, 18, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.auth-fade-up {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: authFadeUp 650ms cubic-bezier(0.2, 0.65, 0.2, 1) forwards;
+}
+
+.auth-shake {
+  animation: authShake 380ms ease;
+}
+
+.auth-orb {
+  width: 13rem;
+  height: 13rem;
+  border-radius: 9999px;
+  filter: blur(64px);
+  opacity: 0.6;
+  animation: authFloat 6.2s ease-in-out infinite;
+}
+
+.auth-orb-indigo {
+  background: rgba(99, 102, 241, 0.46);
+}
+
+.auth-orb-cyan {
+  background: rgba(6, 182, 212, 0.44);
+}
+
+.dash-nav-enter {
+  opacity: 0;
+  transform: translateX(-16px);
+  animation: dashNavSlideIn 520ms cubic-bezier(0.2, 0.65, 0.2, 1) forwards;
+}
+
+.dash-page-enter {
+  animation: dashPageFadeIn 380ms cubic-bezier(0.2, 0.65, 0.2, 1);
+}
+
+.dash-stat-enter {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: dashStatRise 500ms cubic-bezier(0.2, 0.65, 0.2, 1) forwards;
+}
+
+.dash-gradient-text {
+  background-image: linear-gradient(100deg, #e2e8f0, #93c5fd, #818cf8, #67e8f9);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: dashGradientShift 8s ease infinite;
+}
+
+.product-modal-drop {
+  animation: productModalDrop 260ms cubic-bezier(0.2, 0.65, 0.2, 1);
+}
+
+.order-item-enter {
+  animation: orderItemIn 220ms cubic-bezier(0.2, 0.65, 0.2, 1);
+}
+
+.order-item-exit {
+  animation: orderItemOut 180ms ease forwards;
+}
+
+.restock-high-pulse {
+  animation: restockPulseBadge 1.8s ease-in-out infinite;
+}
+
+.restock-card-enter {
+  opacity: 0;
+  transform: translateY(12px) scale(0.985);
+  animation: restockCardIn 420ms cubic-bezier(0.2, 0.65, 0.2, 1) forwards;
+}
+
+.log-entry-new {
+  animation:
+    logEntrySlide 320ms cubic-bezier(0.2, 0.65, 0.2, 1),
+    logEntryFlash 1600ms ease;
+}

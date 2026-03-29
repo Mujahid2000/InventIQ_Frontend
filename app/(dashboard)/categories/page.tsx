@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   AlertTriangle,
@@ -18,8 +18,14 @@ import {
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "@/lib/axios";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  useCreateCategoryMutation,
+  useDeleteCategoryMutation,
+  useGetCategoriesQuery,
+  useUpdateCategoryMutation,
+} from "@/store/api";
 
 type Category = {
   _id: string;
@@ -49,17 +55,7 @@ const COLOR_SWATCHES = [
 const CARD_FALLBACK_COLOR = COLOR_SWATCHES[0].hex;
 
 function getErrorMessage(error: unknown, fallback: string) {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "response" in error &&
-    typeof (error as { response?: { data?: { message?: string } } }).response
-      ?.data?.message === "string"
-  ) {
-    return (error as { response: { data: { message: string } } }).response.data
-      .message;
-  }
-  return fallback;
+  return getApiErrorMessage(error, fallback);
 }
 
 function hexToRgba(hex: string, alpha: number) {
@@ -90,9 +86,27 @@ function resolveColor(category: Category, index: number) {
 export default function CategoriesPage() {
   const { role } = useAuth();
   const isManager = role === "manager";
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const {
+    data: categoriesData,
+    isLoading: loading,
+    error: categoriesError,
+    refetch,
+  } = useGetCategoriesQuery();
+  const [createCategory] = useCreateCategoryMutation();
+  const [updateCategory] = useUpdateCategoryMutation();
+  const [deleteCategory] = useDeleteCategoryMutation();
+
+  const categories = useMemo(() => {
+    const list = Array.isArray(categoriesData) ? categoriesData : [];
+    return (list as Category[]).map((category) => ({
+      ...category,
+      productCount: Number(category.productCount || 0),
+    }));
+  }, [categoriesData]);
+  const error = categoriesError
+    ? getErrorMessage(categoriesError, "Failed to load categories.")
+    : null;
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorClosing, setEditorClosing] = useState(false);
@@ -121,29 +135,6 @@ export default function CategoriesPage() {
   const watchedName = watch("name") || "";
   const watchedDescription = watch("description") || "";
   const watchedIconColor = watch("iconColor") || CARD_FALLBACK_COLOR;
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const { data } = await api.get<Category[]>("/api/categories");
-
-      const list = (Array.isArray(data) ? data : []).map((category) => ({
-        ...category,
-        productCount: Number(category.productCount || 0),
-      }));
-
-      setCategories(list);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, "Failed to load categories."));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
 
   const stats = useMemo(() => {
     const totalCategories = categories.length;
@@ -198,14 +189,13 @@ export default function CategoriesPage() {
 
     try {
       if (editingCategory) {
-        await api.put(`/api/categories/${editingCategory._id}`, payload);
+        await updateCategory({ id: editingCategory._id, body: payload }).unwrap();
         toast.success("Category updated.");
       } else {
-        await api.post("/api/categories", payload);
+        await createCategory(payload).unwrap();
         toast.success("Category created.");
       }
 
-      await fetchCategories();
       closeEditor();
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Could not save category."));
@@ -233,9 +223,8 @@ export default function CategoriesPage() {
 
     setDeleting(true);
     try {
-      await api.delete(`/api/categories/${deleteTarget._id}`);
+      await deleteCategory({ id: deleteTarget._id }).unwrap();
       toast.success("Category deleted.");
-      await fetchCategories();
       closeDeleteModal();
     } catch (err: unknown) {
       setDeleting(false);
@@ -302,7 +291,7 @@ export default function CategoriesPage() {
           <p className="text-sm text-red-200">{error}</p>
           <button
             type="button"
-            onClick={fetchCategories}
+            onClick={refetch}
             className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-300/35 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-100 transition hover:bg-red-500/20"
           >
             <RefreshCw className="h-4 w-4" />

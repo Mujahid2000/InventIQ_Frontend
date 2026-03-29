@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -20,8 +20,14 @@ import {
   Clock3,
   DollarSign,
 } from "lucide-react";
-import api from "@/lib/axios";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  useGetDashboardStatsQuery,
+  useGetLogsQuery,
+  useGetOrdersQuery,
+  useGetProductsQuery,
+} from "@/store/api";
 
 type StatsResponse = {
   totalOrdersToday: number;
@@ -60,13 +66,6 @@ type Log = {
   entityType?: string;
   createdAt: string;
   user?: { name?: string; email?: string };
-};
-
-type Metrics = {
-  totalOrdersToday: number;
-  pendingOrders: number;
-  lowStockCount: number;
-  revenueToday: number;
 };
 
 type Trend = {
@@ -110,11 +109,6 @@ function buildWeekSeries(orders: Order[]): WeeklyPoint[] {
     if (bucket) bucket.orders += 1;
   }
   return days;
-}
-
-function percentChange(current: number, previous: number | null): number {
-  if (previous === null || previous === 0) return 0;
-  return ((current - previous) / Math.abs(previous)) * 100;
 }
 
 function formatTrend(value: number) {
@@ -220,87 +214,57 @@ function StatCard({
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [logs, setLogs] = useState<Log[]>([]);
-  const [trends, setTrends] = useState<Trend>({
+
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    error: statsError,
+  } = useGetDashboardStatsQuery(undefined, { pollingInterval: 30_000 });
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+    error: ordersError,
+  } = useGetOrdersQuery(undefined, { pollingInterval: 30_000 });
+  const {
+    data: productsData,
+    isLoading: productsLoading,
+    error: productsError,
+  } = useGetProductsQuery(undefined, { pollingInterval: 30_000 });
+  const {
+    data: logsData,
+    isLoading: logsLoading,
+    error: logsError,
+  } = useGetLogsQuery({ limit: 5, page: 1 }, { pollingInterval: 30_000 });
+
+  const stats = useMemo(
+    () => (statsData ? (statsData as StatsResponse) : null),
+    [statsData],
+  );
+  const orders = useMemo(
+    () => (Array.isArray(ordersData) ? (ordersData as Order[]) : []),
+    [ordersData],
+  );
+  const products = useMemo(
+    () => (Array.isArray(productsData) ? (productsData as Product[]) : []),
+    [productsData],
+  );
+  const logs = useMemo(
+    () => (Array.isArray(logsData) ? (logsData as Log[]) : []),
+    [logsData],
+  );
+
+  const loading = statsLoading || ordersLoading || productsLoading || logsLoading;
+  const firstError = statsError || ordersError || productsError || logsError;
+  const error = firstError
+    ? getApiErrorMessage(firstError, "Unable to load dashboard data.")
+    : null;
+
+  const trends: Trend = {
     totalOrdersToday: 0,
     pendingOrders: 0,
     lowStockCount: 0,
     revenueToday: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const previousMetricsRef = useRef<Metrics | null>(null);
-
-  const loadData = useCallback(async () => {
-    try {
-      setError(null);
-      const [statsRes, ordersRes, productsRes, logsRes] = await Promise.all([
-        api.get<StatsResponse>("/api/dashboard/stats"),
-        api.get<Order[]>("/api/orders"),
-        api.get<Product[]>("/api/products"),
-        api.get<Log[]>("/api/logs"),
-      ]);
-
-      const nextMetrics: Metrics = {
-        totalOrdersToday: statsRes.data.totalOrdersToday || 0,
-        pendingOrders: statsRes.data.pendingOrders || 0,
-        lowStockCount: statsRes.data.lowStockCount || 0,
-        revenueToday: statsRes.data.revenueToday || 0,
-      };
-
-      const previous = previousMetricsRef.current;
-      setTrends({
-        totalOrdersToday: percentChange(
-          nextMetrics.totalOrdersToday,
-          previous?.totalOrdersToday ?? null,
-        ),
-        pendingOrders: percentChange(
-          nextMetrics.pendingOrders,
-          previous?.pendingOrders ?? null,
-        ),
-        lowStockCount: percentChange(
-          nextMetrics.lowStockCount,
-          previous?.lowStockCount ?? null,
-        ),
-        revenueToday: percentChange(
-          nextMetrics.revenueToday,
-          previous?.revenueToday ?? null,
-        ),
-      });
-      previousMetricsRef.current = nextMetrics;
-
-      setStats(statsRes.data);
-      setOrders(Array.isArray(ordersRes.data) ? ordersRes.data : []);
-      setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
-      setLogs((Array.isArray(logsRes.data) ? logsRes.data : []).slice(0, 5));
-    } catch (err: unknown) {
-      if (
-        typeof err === "object" &&
-        err !== null &&
-        "response" in err &&
-        typeof (err as { response?: { data?: { message?: string } } }).response
-          ?.data?.message === "string"
-      ) {
-        setError(
-          (err as { response: { data: { message: string } } }).response.data
-            .message,
-        );
-      } else {
-        setError("Unable to load dashboard data.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadData();
-    const timer = setInterval(loadData, 30_000);
-    return () => clearInterval(timer);
-  }, [loadData]);
+  };
 
   const weeklySeries = useMemo(() => buildWeekSeries(orders), [orders]);
 

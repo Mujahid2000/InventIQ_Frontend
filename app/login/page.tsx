@@ -7,7 +7,8 @@ import { useForm } from "react-hook-form";
 import { Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/hooks/useAuth";
-import api from "@/lib/axios";
+import { getApiErrorMessage, getApiErrorStatus } from "@/lib/api-error";
+import { useLoginMutation } from "@/store/api";
 import AuthShell from "@/components/auth/AuthShell";
 
 type LoginFormValues = {
@@ -15,24 +16,11 @@ type LoginFormValues = {
   password: string;
 };
 
-function errorMessage(error: unknown, fallback: string) {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "response" in error &&
-    typeof (error as { response?: { data?: { message?: string } } }).response
-      ?.data?.message === "string"
-  ) {
-    return (error as { response: { data: { message: string } } }).response.data
-      .message;
-  }
-  return fallback;
-}
-
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [loginRequest] = useLoginMutation();
 
   const {
     register,
@@ -60,36 +48,20 @@ export default function LoginPage() {
 
   async function onSubmit(values: LoginFormValues) {
     try {
-      const { data } = await api.post("/api/auth/login", values);
+      const data = await loginRequest(values).unwrap();
       login(data.token, data.user);
 
       toast.success("Login successful! Welcome back.");
       router.replace("/dashboard");
     } catch (error: unknown) {
-      const status =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { status?: number } }).response?.status === "number"
-          ? (error as { response: { status: number } }).response.status
-          : undefined;
+      const status = getApiErrorStatus(error);
 
       if (status === 401) {
         toast.error("Invalid email or password.");
         return;
       }
 
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        !(error as { response?: unknown }).response
-      ) {
-        toast.error("Something went wrong. Try again.");
-        return;
-      }
-
-      toast.error("Something went wrong. Try again.");
+      toast.error(getApiErrorMessage(error, "Something went wrong. Try again."));
     }
   }
 

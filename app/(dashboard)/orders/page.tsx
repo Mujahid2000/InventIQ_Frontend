@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
   Ban,
   CalendarDays,
   Eye,
@@ -12,7 +11,14 @@ import {
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "@/lib/axios";
+import { getApiErrorMessage } from "@/lib/api-error";
+import {
+  useCancelOrderMutation,
+  useCreateOrderMutation,
+  useGetOrdersQuery,
+  useGetProductsQuery,
+  useUpdateOrderStatusMutation,
+} from "@/store/api";
 
 type OrderStatus =
   | "pending"
@@ -86,17 +92,7 @@ const currency = new Intl.NumberFormat("en-US", {
 });
 
 function getErrorMessage(error: unknown, fallback: string) {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "response" in error &&
-    typeof (error as { response?: { data?: { message?: string } } }).response
-      ?.data?.message === "string"
-  ) {
-    return (error as { response: { data: { message: string } } }).response.data
-      .message;
-  }
-  return fallback;
+  return getApiErrorMessage(error, fallback);
 }
 
 function normalizeStatus(status: string | undefined): OrderStatus {
@@ -168,9 +164,30 @@ function OrderSkeleton() {
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+    error: ordersError,
+  } = useGetOrdersQuery();
+  const {
+    data: productsData,
+    isLoading: productsLoading,
+    error: productsError,
+  } = useGetProductsQuery();
+  const [createOrder] = useCreateOrderMutation();
+  const [updateOrderStatus] = useUpdateOrderStatusMutation();
+  const [cancelOrderMutation] = useCancelOrderMutation();
+
+  const orders = useMemo(
+    () => (Array.isArray(ordersData) ? (ordersData as Order[]) : []),
+    [ordersData],
+  );
+  const products = useMemo(
+    () => (Array.isArray(productsData) ? (productsData as Product[]) : []),
+    [productsData],
+  );
+  const loading = ordersLoading || productsLoading;
+  const lastLoadErrorRef = useRef("");
 
   const [activeTab, setActiveTab] = useState<"all" | OrderStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -188,26 +205,16 @@ export default function OrdersPage() {
   const [nextStatus, setNextStatus] = useState<OrderStatus | "">("");
   const [updating, setUpdating] = useState(false);
 
-  const fetchAll = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [ordersRes, productsRes] = await Promise.all([
-        api.get<Order[]>("/api/orders"),
-        api.get<Product[]>("/api/products"),
-      ]);
-
-      setOrders(Array.isArray(ordersRes.data) ? ordersRes.data : []);
-      setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to load orders."));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+    const firstError = ordersError || productsError;
+    if (!firstError) return;
+
+    const message = getErrorMessage(firstError, "Failed to load orders.");
+    if (lastLoadErrorRef.current === message) return;
+
+    lastLoadErrorRef.current = message;
+    toast.error(message);
+  }, [ordersError, productsError]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -404,18 +411,17 @@ export default function OrdersPage() {
 
     setPlacing(true);
     try {
-      await api.post("/api/orders", {
+      await createOrder({
         customerName: customerName.trim(),
         items: rowsWithProduct.map((row) => ({
           product: row.productId,
           quantity: row.quantity,
         })),
-      });
+      }).unwrap();
 
       toast.success("Order created successfully.");
       setCreateOpen(false);
       resetCreateForm();
-      fetchAll();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to create order."));
     } finally {
@@ -437,11 +443,8 @@ export default function OrdersPage() {
     if (!selectedOrder || !nextStatus) return;
     setUpdating(true);
     try {
-      await api.put(`/api/orders/${selectedOrder._id}/status`, {
-        status: nextStatus,
-      });
+      await updateOrderStatus({ id: selectedOrder._id, status: nextStatus }).unwrap();
       toast.success("Order status updated.");
-      await fetchAll();
       setDetailOpen(false);
       setSelectedOrder(null);
     } catch (error: unknown) {
@@ -460,9 +463,8 @@ export default function OrdersPage() {
     if (!confirmed) return;
 
     try {
-      await api.put(`/api/orders/${order._id}/cancel`);
+      await cancelOrderMutation({ id: order._id }).unwrap();
       toast.success("Order cancelled.");
-      await fetchAll();
       if (fromDetail) {
         setDetailOpen(false);
         setSelectedOrder(null);

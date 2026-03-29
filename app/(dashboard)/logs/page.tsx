@@ -16,7 +16,8 @@ import {
   User,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "@/lib/axios";
+import { getApiErrorMessage } from "@/lib/api-error";
+import { useLazyGetLogsQuery } from "@/store/api";
 
 const PAGE_SIZE = 10;
 
@@ -33,17 +34,7 @@ type ActivityLog = {
 };
 
 function getErrorMessage(error: unknown, fallback: string) {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "response" in error &&
-    typeof (error as { response?: { data?: { message?: string } } }).response
-      ?.data?.message === "string"
-  ) {
-    return (error as { response: { data: { message: string } } }).response.data
-      .message;
-  }
-  return fallback;
+  return getApiErrorMessage(error, fallback);
 }
 
 function formatAction(action: string) {
@@ -189,6 +180,8 @@ function actionMeta(action: string) {
 }
 
 export default function LogsPage() {
+  const [getLogsRequest] = useLazyGetLogsQuery();
+
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -230,7 +223,7 @@ export default function LogsPage() {
       try {
         if (showLoader) setLoading(true);
         const limit = pageToKeep * PAGE_SIZE;
-        const { data } = await api.get<ActivityLog[]>(`/api/logs?limit=${limit}&page=1`);
+        const data = await getLogsRequest({ limit, page: 1 }).unwrap();
         const normalized = Array.isArray(data) ? data : [];
         trackNewEntries(normalized);
         setLogs(normalized);
@@ -242,7 +235,7 @@ export default function LogsPage() {
         if (showLoader) setLoading(false);
       }
     },
-    [trackNewEntries],
+    [getLogsRequest, trackNewEntries],
   );
 
   const loadMore = useCallback(async () => {
@@ -251,7 +244,7 @@ export default function LogsPage() {
     const nextPage = page + 1;
     try {
       setLoadingMore(true);
-      const { data } = await api.get<ActivityLog[]>(`/api/logs?limit=${PAGE_SIZE}&page=${nextPage}`);
+      const data = await getLogsRequest({ limit: PAGE_SIZE, page: nextPage }).unwrap();
       const nextChunk = Array.isArray(data) ? data : [];
 
       setLogs((prev) => {
@@ -268,7 +261,7 @@ export default function LogsPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loadingMore, page]);
+  }, [getLogsRequest, hasMore, loadingMore, page]);
 
   useEffect(() => {
     fetchLogs(1, true);

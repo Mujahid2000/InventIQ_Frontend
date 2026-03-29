@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   X,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 type FeatureItem = {
   title: string;
@@ -78,20 +79,19 @@ const NAV_LINKS = [
 
 export default function Home() {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const { token, initialized } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [howVisible, setHowVisible] = useState(false);
   const howRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const token = window.localStorage.getItem("auth_token");
-    if (token) {
+    if (initialized && token) {
       router.replace("/dashboard");
-      return;
     }
-    setReady(true);
-  }, [router]);
+  }, [initialized, router, token]);
+
+  const ready = initialized && !token;
 
   useEffect(() => {
     const onScroll = () => {

@@ -1,9 +1,14 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { PackageOpen, PlusCircle } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "@/lib/axios";
+import { getApiErrorMessage } from "@/lib/api-error";
+import {
+  useDeleteRestockItemMutation,
+  useGetRestockQueueQuery,
+  useUpdateRestockItemMutation,
+} from "@/store/api";
 
 type QueueItem = {
   _id: string;
@@ -21,17 +26,7 @@ type QueueItem = {
 };
 
 function getErrorMessage(error: unknown, fallback: string) {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "response" in error &&
-    typeof (error as { response?: { data?: { message?: string } } }).response
-      ?.data?.message === "string"
-  ) {
-    return (error as { response: { data: { message: string } } }).response.data
-      .message;
-  }
-  return fallback;
+  return getApiErrorMessage(error, fallback);
 }
 
 function priorityBadgeClass(priority: string) {
@@ -79,31 +74,23 @@ function stockRatioPercent(item: QueueItem) {
 }
 
 export default function RestockPage() {
-  const [items, setItems] = useState<QueueItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: itemsData,
+    isLoading: loading,
+    refetch,
+  } = useGetRestockQueueQuery();
+  const [updateRestockItem] = useUpdateRestockItemMutation();
+  const [deleteRestockItem] = useDeleteRestockItemMutation();
+
+  const items = useMemo(
+    () => (Array.isArray(itemsData) ? (itemsData as QueueItem[]) : []),
+    [itemsData],
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [targetItem, setTargetItem] = useState<QueueItem | null>(null);
   const [newStock, setNewStock] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const fetchQueue = useCallback(async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get<QueueItem[]>("/api/restock");
-      const list = Array.isArray(data) ? data : [];
-      list.sort((a, b) => a.currentStock - b.currentStock);
-      setItems(list);
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to load restock queue."));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchQueue();
-  }, [fetchQueue]);
 
   function openRestockModal(item: QueueItem) {
     setTargetItem(item);
@@ -137,13 +124,12 @@ export default function RestockPage() {
 
     setSaving(true);
     try {
-      await api.put(`/api/restock/${targetItem._id}`, { amount });
-      await api.delete(`/api/restock/${targetItem._id}`);
+      await updateRestockItem({ id: targetItem._id, amount }).unwrap();
+      await deleteRestockItem({ id: targetItem._id }).unwrap();
       toast.success("Item restocked and removed from queue.");
       setModalOpen(false);
       setTargetItem(null);
       setNewStock("");
-      fetchQueue();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to restock item."));
     } finally {
@@ -158,9 +144,8 @@ export default function RestockPage() {
     if (!confirmed) return;
 
     try {
-      await api.delete(`/api/restock/${item._id}`);
+      await deleteRestockItem({ id: item._id }).unwrap();
       toast.success("Queue item removed.");
-      fetchQueue();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to remove item."));
     }
@@ -189,7 +174,7 @@ export default function RestockPage() {
 
           <button
             type="button"
-            onClick={fetchQueue}
+            onClick={refetch}
             className="rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-slate-200 hover:bg-white/[0.08]"
           >
             Refresh

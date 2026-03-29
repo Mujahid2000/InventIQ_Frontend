@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   AlertTriangle,
@@ -11,8 +11,15 @@ import {
   Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import api from "@/lib/axios";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  useCreateProductMutation,
+  useDeleteProductMutation,
+  useGetCategoriesQuery,
+  useGetProductsQuery,
+  useUpdateProductMutation,
+} from "@/store/api";
 
 type Category = {
   _id: string;
@@ -42,17 +49,7 @@ type ProductFormValues = {
 const PAGE_SIZE = 10;
 
 function getErrorMessage(error: unknown, fallback: string) {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "response" in error &&
-    typeof (error as { response?: { data?: { message?: string } } }).response
-      ?.data?.message === "string"
-  ) {
-    return (error as { response: { data: { message: string } } }).response.data
-      .message;
-  }
-  return fallback;
+  return getApiErrorMessage(error, fallback);
 }
 
 function categoryName(product: Product) {
@@ -108,9 +105,30 @@ function SkeletonRows() {
 export default function ProductsPage() {
   const { role } = useAuth();
   const isManager = role === "manager";
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const {
+    data: productsData,
+    isLoading: productsLoading,
+    error: productsError,
+  } = useGetProductsQuery();
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useGetCategoriesQuery();
+  const [createProduct] = useCreateProductMutation();
+  const [updateProduct] = useUpdateProductMutation();
+  const [deleteProduct] = useDeleteProductMutation();
+
+  const products = useMemo(
+    () => (Array.isArray(productsData) ? (productsData as Product[]) : []),
+    [productsData],
+  );
+  const categories = useMemo(
+    () => (Array.isArray(categoriesData) ? (categoriesData as Category[]) : []),
+    [categoriesData],
+  );
+  const loading = productsLoading || categoriesLoading;
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -122,6 +140,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [categorySearch, setCategorySearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const lastLoadErrorRef = useRef("");
 
   const {
     register,
@@ -151,25 +170,16 @@ export default function ProductsPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const fetchAll = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [productsRes, categoriesRes] = await Promise.all([
-        api.get<Product[]>("/api/products"),
-        api.get<Category[]>("/api/categories"),
-      ]);
-      setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
-      setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to load products."));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+    const firstError = productsError || categoriesError;
+    if (!firstError) return;
+
+    const message = getErrorMessage(firstError, "Failed to load products.");
+    if (lastLoadErrorRef.current === message) return;
+
+    lastLoadErrorRef.current = message;
+    toast.error(message);
+  }, [productsError, categoriesError]);
 
   const filteredCategories = useMemo(() => {
     const q = categorySearch.trim().toLowerCase();
@@ -266,16 +276,15 @@ export default function ProductsPage() {
       };
 
       if (editingProduct) {
-        await api.put(`/api/products/${editingProduct._id}`, payload);
+        await updateProduct({ id: editingProduct._id, body: payload }).unwrap();
         toast.success("Product updated successfully.");
       } else {
-        await api.post("/api/products", payload);
+        await createProduct(payload).unwrap();
         toast.success("Product created successfully.");
       }
 
       setFormOpen(false);
       setEditingProduct(null);
-      fetchAll();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to save product."));
     }
@@ -284,10 +293,9 @@ export default function ProductsPage() {
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
-      await api.delete(`/api/products/${deleteTarget._id}`);
+      await deleteProduct({ id: deleteTarget._id }).unwrap();
       toast.success("Product deleted.");
       setDeleteTarget(null);
-      fetchAll();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to delete product."));
     }

@@ -8,6 +8,7 @@ import {
 import { clearStoredAuth, readStoredAuth } from "@/lib/auth-storage";
 import { logout } from "@/store/authSlice";
 import type { RootState } from "@/store/store";
+import type { AuthUser } from "@/types";
 
 const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -55,7 +56,7 @@ type ApiList = ApiObject[];
 
 type AuthResponse = {
   token: string;
-  user: ApiObject;
+  user: AuthUser;
 };
 
 type LoginPayload = {

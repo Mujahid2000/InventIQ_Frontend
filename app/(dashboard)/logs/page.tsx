@@ -224,7 +224,7 @@ export default function LogsPage() {
         if (showLoader) setLoading(true);
         const limit = pageToKeep * PAGE_SIZE;
         const data = await getLogsRequest({ limit, page: 1 }).unwrap();
-        const normalized = Array.isArray(data) ? data : [];
+        const normalized = (Array.isArray(data) ? data : []) as ActivityLog[];
         trackNewEntries(normalized);
         setLogs(normalized);
         setPage(pageToKeep);
@@ -245,7 +245,7 @@ export default function LogsPage() {
     try {
       setLoadingMore(true);
       const data = await getLogsRequest({ limit: PAGE_SIZE, page: nextPage }).unwrap();
-      const nextChunk = Array.isArray(data) ? data : [];
+      const nextChunk = (Array.isArray(data) ? data : []) as ActivityLog[];
 
       setLogs((prev) => {
         const seen = new Set(prev.map((item) => item._id));

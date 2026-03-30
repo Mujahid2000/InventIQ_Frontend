@@ -47,6 +47,7 @@ export default function ProductFormModal({
   } = form;
 
   const activeFormStatus = watch("isActive");
+  const isActive = activeFormStatus === true;
 
   return (
     <ModalShell
@@ -157,24 +158,32 @@ export default function ProductFormModal({
           <button
             type="button"
             onClick={() =>
-              setValue("isActive", !activeFormStatus, {
+              setValue("isActive", !isActive, {
                 shouldValidate: true,
                 shouldDirty: true,
               })
             }
-            className={`relative inline-flex h-10 w-full items-center rounded-xl border px-3 transition ${
-              activeFormStatus
+            className={`inline-flex h-10 w-full items-center justify-between rounded-xl border px-3 transition ${
+              isActive
                 ? "border-emerald-400/50 bg-emerald-500/20"
                 : "border-red-400/50 bg-red-500/20"
             }`}
+            aria-pressed={isActive}
           >
             <span
-              className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                activeFormStatus ? "translate-x-7" : "translate-x-0"
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition ${
+                isActive ? "border-emerald-300/60 bg-emerald-500/35" : "border-red-300/60 bg-red-500/30"
               }`}
-            />
-            <span className="ml-4 text-sm font-medium text-slate-100">
-              {activeFormStatus ? "Active" : "Inactive"}
+            >
+              <span
+                className={`absolute left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  isActive ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </span>
+
+            <span className="ml-3 text-sm font-medium text-slate-100">
+              {isActive ? "Active" : "Inactive"}
             </span>
           </button>
           <input type="hidden" {...register("isActive")} />

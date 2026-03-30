@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
-  AlertTriangle,
   PackageOpen,
   Pencil,
   Plus,
@@ -11,6 +10,11 @@ import {
   Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import {
+  ProductDeleteModal,
+  ProductFormModal,
+} from "@/components/modals";
+import type { ProductFormValues } from "@/components/modals/products/ProductFormModal";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -35,15 +39,6 @@ type Product = {
   minStockThreshold: number;
   status?: string;
   active?: boolean;
-};
-
-type ProductFormValues = {
-  name: string;
-  category: string;
-  price: number;
-  stockQuantity: number;
-  minStockThreshold: number;
-  isActive: boolean;
 };
 
 const PAGE_SIZE = 10;
@@ -142,14 +137,7 @@ export default function ProductsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const lastLoadErrorRef = useRef("");
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<ProductFormValues>({
+  const form = useForm<ProductFormValues>({
     defaultValues: {
       name: "",
       category: "",
@@ -159,8 +147,7 @@ export default function ProductsPage() {
       isActive: true,
     },
   });
-
-  const activeFormStatus = watch("isActive");
+  const { reset } = form;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -205,11 +192,8 @@ export default function ProductsPage() {
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
 
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
-
-  const pageStart = (page - 1) * PAGE_SIZE;
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
   const paginatedProducts = useMemo(() => {
     return filteredProducts.slice(pageStart, pageStart + PAGE_SIZE);
   }, [filteredProducts, pageStart]);
@@ -220,12 +204,12 @@ export default function ProductsPage() {
     if (totalPages <= 7) {
       return Array.from({ length: totalPages }, (_, idx) => idx + 1);
     }
-    if (page <= 4) return [1, 2, 3, 4, 5, -1, totalPages];
-    if (page >= totalPages - 3) {
+    if (currentPage <= 4) return [1, 2, 3, 4, 5, -1, totalPages];
+    if (currentPage >= totalPages - 3) {
       return [1, -1, totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
     }
-    return [1, -1, page - 1, page, page + 1, -1, totalPages];
-  }, [page, totalPages]);
+    return [1, -1, currentPage - 1, currentPage, currentPage + 1, -1, totalPages];
+  }, [currentPage, totalPages]);
 
   function openAddModal() {
     setEditingProduct(null);
@@ -482,7 +466,7 @@ export default function ProductsPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={page <= 1}
+              disabled={currentPage <= 1}
               onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               className="rounded-lg border border-white/15 bg-white/[0.03] px-3 py-1.5 disabled:opacity-40"
             >
@@ -500,7 +484,7 @@ export default function ProductsPage() {
                   type="button"
                   onClick={() => setPage(n)}
                   className={`h-8 w-8 rounded-lg border text-xs font-semibold ${
-                    page === n
+                    currentPage === n
                       ? "border-indigo-400/70 bg-indigo-500/25 text-indigo-100"
                       : "border-white/15 bg-white/[0.03] text-slate-300"
                   }`}
@@ -512,7 +496,7 @@ export default function ProductsPage() {
 
             <button
               type="button"
-              disabled={page >= totalPages}
+              disabled={currentPage >= totalPages}
               onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
               className="rounded-lg border border-white/15 bg-white/[0.03] px-3 py-1.5 disabled:opacity-40"
             >
@@ -522,200 +506,23 @@ export default function ProductsPage() {
         </div>
       </section>
 
-      {formOpen ? (
-        <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/55 p-4 pt-16 backdrop-blur-sm">
-          <div className="product-modal-drop w-full max-w-3xl rounded-2xl border border-white/15 bg-[#101722] p-5 shadow-[0_24px_50px_rgba(0,0,0,0.55)]">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">
-                {editingProduct ? "Edit Product" : "Add New Product"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setFormOpen(false)}
-                className="rounded-md px-2 py-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
-              >
-                Close
-              </button>
-            </div>
+      <ProductFormModal
+        open={formOpen}
+        editing={Boolean(editingProduct)}
+        categorySearch={categorySearch}
+        onCategorySearchChange={setCategorySearch}
+        categories={filteredCategories}
+        form={form}
+        onClose={() => setFormOpen(false)}
+        onSubmit={onSubmit}
+      />
 
-            <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-medium text-slate-300">
-                  Product Name
-                </label>
-                <input
-                  {...register("name", {
-                    required: "Product name is required",
-                    minLength: { value: 2, message: "At least 2 characters" },
-                  })}
-                  className="w-full rounded-xl border border-white/15 bg-[#0f141d] px-3 py-2 text-slate-100 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-500/20"
-                />
-                {errors.name ? (
-                  <p className="mt-1 text-xs text-red-300">{errors.name.message}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">
-                  Category
-                </label>
-                <input
-                  value={categorySearch}
-                  onChange={(e) => setCategorySearch(e.target.value)}
-                  placeholder="Search category..."
-                  className="mb-2 w-full rounded-xl border border-white/15 bg-[#0f141d] px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-500/20"
-                />
-                <select
-                  {...register("category", { required: "Category is required" })}
-                  className="w-full rounded-xl border border-white/15 bg-[#0f141d] px-3 py-2 text-slate-100 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-500/20"
-                >
-                  <option value="">Select category</option>
-                  {filteredCategories.map((cat) => (
-                    <option key={cat._id} value={cat._id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.category ? (
-                  <p className="mt-1 text-xs text-red-300">{errors.category.message}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">Price</label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    ৳
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    {...register("price", {
-                      required: "Price is required",
-                      valueAsNumber: true,
-                      min: { value: 0, message: "Price cannot be negative" },
-                    })}
-                    className="w-full rounded-xl border border-white/15 bg-[#0f141d] py-2 pl-8 pr-3 text-slate-100 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                </div>
-                {errors.price ? (
-                  <p className="mt-1 text-xs text-red-300">{errors.price.message}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">
-                  Stock Quantity
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  {...register("stockQuantity", {
-                    required: "Stock quantity is required",
-                    valueAsNumber: true,
-                    min: { value: 0, message: "Stock cannot be negative" },
-                  })}
-                  className="w-full rounded-xl border border-white/15 bg-[#0f141d] px-3 py-2 text-slate-100 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-500/20"
-                />
-                {errors.stockQuantity ? (
-                  <p className="mt-1 text-xs text-red-300">{errors.stockQuantity.message}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">
-                  Min Stock Threshold
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  {...register("minStockThreshold", {
-                    required: "Threshold is required",
-                    valueAsNumber: true,
-                    min: { value: 0, message: "Threshold cannot be negative" },
-                  })}
-                  className="w-full rounded-xl border border-white/15 bg-[#0f141d] px-3 py-2 text-slate-100 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-500/20"
-                />
-                {errors.minStockThreshold ? (
-                  <p className="mt-1 text-xs text-red-300">{errors.minStockThreshold.message}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">Status</label>
-                <button
-                  type="button"
-                  onClick={() => setValue("isActive", !activeFormStatus)}
-                  className={`relative inline-flex h-10 w-full items-center rounded-xl border px-3 transition ${
-                    activeFormStatus
-                      ? "border-emerald-400/50 bg-emerald-500/20"
-                      : "border-red-400/50 bg-red-500/20"
-                  }`}
-                >
-                  <span
-                    className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      activeFormStatus ? "translate-x-7" : "translate-x-0"
-                    }`}
-                  />
-                  <span className="ml-4 text-sm font-medium text-slate-100">
-                    {activeFormStatus ? "Active" : "Inactive"}
-                  </span>
-                </button>
-                <input type="hidden" {...register("isActive")} />
-              </div>
-
-              <div className="md:col-span-2 mt-1 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormOpen(false)}
-                  className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-sm text-slate-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {isSubmitting ? "Saving..." : "Save Product"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
-      {deleteTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-red-400/35 bg-[#101722] p-5 text-center shadow-[0_18px_45px_rgba(0,0,0,0.55)]">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-red-500/20 text-red-300">
-              <AlertTriangle className="h-6 w-6" />
-            </div>
-            <h3 className="text-lg font-semibold text-white">Are you sure?</h3>
-            <p className="mt-1 text-sm text-slate-300">
-              Delete {deleteTarget.name}? This action cannot be undone.
-            </p>
-
-            <div className="mt-5 flex justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-sm text-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmDelete}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ProductDeleteModal
+        open={Boolean(deleteTarget)}
+        productName={deleteTarget?.name || "this product"}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

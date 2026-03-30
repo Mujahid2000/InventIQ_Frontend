@@ -3,21 +3,22 @@
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
-  AlertTriangle,
   Boxes,
-  Check,
   FolderOpen,
   Layers3,
-  Loader2,
   MoreVertical,
   Pencil,
   Plus,
   RefreshCw,
   Tag,
   Trash2,
-  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import {
+  CategoryDeleteModal,
+  CategoryEditorModal,
+} from "@/components/modals";
+import type { CategoryFormValues } from "@/components/modals/categories/CategoryEditorModal";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -35,12 +36,6 @@ type Category = {
   updatedAt?: string;
   iconColor?: string;
   productCount?: number;
-};
-
-type CategoryFormValues = {
-  name: string;
-  description: string;
-  iconColor: string;
 };
 
 const COLOR_SWATCHES = [
@@ -117,24 +112,14 @@ export default function CategoriesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<CategoryFormValues>({
+  const form = useForm<CategoryFormValues>({
     defaultValues: {
       name: "",
       description: "",
       iconColor: CARD_FALLBACK_COLOR,
     },
   });
-
-  const watchedName = watch("name") || "";
-  const watchedDescription = watch("description") || "";
-  const watchedIconColor = watch("iconColor") || CARD_FALLBACK_COLOR;
+  const { reset } = form;
 
   const stats = useMemo(() => {
     const totalCategories = categories.length;
@@ -384,231 +369,23 @@ export default function CategoriesPage() {
         </section>
       )}
 
-      {editorOpen ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div
-            className={`w-full max-w-[480px] rounded-2xl border border-white/10 bg-[#161B22] p-7 shadow-[0_24px_60px_rgba(0,0,0,0.45)] ${
-              editorClosing ? "cat-modal-exit" : "cat-modal-enter"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <h2 className="text-xl font-semibold text-white">
-                {editingCategory ? "Edit Category" : "Add New Category"}
-              </h2>
-              <button
-                type="button"
-                onClick={closeEditor}
-                className="rounded-md p-1.5 text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <CategoryEditorModal
+        open={editorOpen}
+        closing={editorClosing}
+        editing={Boolean(editingCategory)}
+        colorSwatches={COLOR_SWATCHES}
+        form={form}
+        onClose={closeEditor}
+        onSubmit={handleSave}
+      />
 
-            <div className="my-4 h-px bg-white/10" />
-
-            <form onSubmit={handleSubmit(handleSave)} className="space-y-4">
-              <div>
-                <div className="mb-1 flex items-center justify-between">
-                  <label className="text-sm font-medium text-slate-300">Category Name *</label>
-                  <span className="text-xs text-slate-500">{watchedName.length}/30</span>
-                </div>
-                <input
-                  {...register("name", {
-                    required: "Category name is required",
-                    minLength: { value: 2, message: "At least 2 characters required" },
-                    maxLength: { value: 30, message: "Maximum 30 characters" },
-                  })}
-                  className="w-full rounded-xl border border-white/10 bg-[#0D1117] px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-500/20"
-                />
-                {errors.name ? (
-                  <p className="mt-1 text-xs text-red-300">{errors.name.message}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">
-                  Description (optional)
-                </label>
-                <textarea
-                  rows={3}
-                  {...register("description")}
-                  className="w-full resize-none rounded-xl border border-white/10 bg-[#0D1117] px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">Icon Color</label>
-                <div className="flex flex-wrap items-center gap-2">
-                  {COLOR_SWATCHES.map((swatch) => {
-                    const selected = watchedIconColor === swatch.hex;
-                    return (
-                      <button
-                        key={swatch.hex}
-                        type="button"
-                        title={swatch.label}
-                        onClick={() =>
-                          setValue("iconColor", swatch.hex, {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          })
-                        }
-                        className={`relative h-8 w-8 rounded-full transition ${
-                          selected ? "ring-2 ring-white ring-offset-2 ring-offset-[#161B22]" : ""
-                        }`}
-                        style={{ backgroundColor: swatch.hex }}
-                      >
-                        {selected ? (
-                          <Check className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-white" />
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-                <input type="hidden" {...register("iconColor")} />
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-[#0D1117] p-3">
-                <p className="mb-2 text-xs uppercase tracking-[0.14em] text-slate-500">Live Preview</p>
-                <div className="rounded-xl border border-white/10 bg-[#161B22] p-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg"
-                      style={{
-                        backgroundColor: hexToRgba(watchedIconColor, 0.2),
-                        color: watchedIconColor,
-                        border: `1px solid ${hexToRgba(watchedIconColor, 0.4)}`,
-                      }}
-                    >
-                      <Tag className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">
-                        {watchedName.trim() || "Category Name"}
-                      </p>
-                      <span className="inline-flex rounded-full bg-indigo-500/20 px-2 py-0.5 text-[11px] text-indigo-200">
-                        0 products
-                      </span>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-xs text-slate-400">
-                    {watchedDescription.trim() || "Description preview will appear here."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={closeEditor}
-                  className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2 text-sm text-slate-300 transition hover:bg-white/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#6366F1] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
-                >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {isSubmitting ? "Saving..." : "Save Category"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
-      {deleteOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div
-            className={`w-full max-w-[380px] rounded-2xl border border-white/10 bg-[#161B22] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.45)] ${
-              deleteClosing ? "cat-modal-exit" : "cat-modal-enter"
-            }`}
-          >
-            <div className="mx-auto mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-red-500/20 text-red-300">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
-            <h3 className="text-center text-lg font-semibold text-white">Delete Category?</h3>
-            <p className="mt-2 text-center text-sm leading-relaxed text-slate-400">
-              This will not delete the products inside. Are you sure you want to continue?
-            </p>
-
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={closeDeleteModal}
-                className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2 text-sm text-slate-300 transition hover:bg-white/[0.06]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60"
-              >
-                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {deleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <style jsx>{`
-        @keyframes catCardIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes catModalIn {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-
-        @keyframes catModalOut {
-          from {
-            opacity: 1;
-            transform: scale(1);
-          }
-          to {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-        }
-
-        .cat-card-enter {
-          opacity: 0;
-          animation: catCardIn 360ms cubic-bezier(0.2, 0.65, 0.2, 1) forwards;
-        }
-
-        .cat-modal-enter {
-          animation: catModalIn 150ms ease-out forwards;
-        }
-
-        .cat-modal-exit {
-          animation: catModalOut 150ms ease-in forwards;
-        }
-
-        .cat-line-clamp-2 {
-          overflow: hidden;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-        }
-      `}</style>
+      <CategoryDeleteModal
+        open={deleteOpen}
+        closing={deleteClosing}
+        deleting={deleting}
+        onClose={closeDeleteModal}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

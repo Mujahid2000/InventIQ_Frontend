@@ -7,10 +7,12 @@ import {
   Eye,
   Plus,
   Search,
-  ShoppingCart,
-  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import {
+  CreateOrderModal,
+  OrderDetailModal,
+} from "@/components/modals";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
   useCancelOrderMutation,
@@ -690,290 +692,40 @@ export default function OrdersPage() {
         </div>
       </section>
 
-      {createOpen ? (
-        <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-6">
-          <div className="product-modal-drop h-[calc(100vh-1.5rem)] w-full overflow-hidden rounded-2xl border border-white/15 bg-[#101722] shadow-[0_24px_50px_rgba(0,0,0,0.55)] sm:h-auto sm:max-w-5xl">
-            <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-                <h2 className="text-xl font-semibold text-white">Create New Order</h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreateOpen(false);
-                    resetCreateForm();
-                  }}
-                  className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
+      <CreateOrderModal
+        open={createOpen}
+        customerName={customerName}
+        orderRows={orderRows}
+        products={products}
+        createSubtotal={createSubtotal}
+        placing={placing}
+        currencyFormatter={currency}
+        onClose={() => {
+          setCreateOpen(false);
+          resetCreateForm();
+        }}
+        onCustomerNameChange={setCustomerName}
+        onAddRow={addRow}
+        onRemoveRow={removeRow}
+        onProductSelect={handleProductSelect}
+        onQuantityChange={handleQuantityChange}
+        onPlaceOrder={placeOrder}
+      />
 
-              <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-300">
-                    Customer Info
-                  </h3>
-                  <input
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Customer Name"
-                    className="w-full rounded-xl border border-white/15 bg-[#0f141d] px-3 py-2 text-slate-100 outline-none transition focus:border-indigo-400/70 focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                </section>
-
-                <section>
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
-                      Order Items
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={addRow}
-                      className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs text-slate-200 hover:bg-white/[0.08]"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add Product
-                    </button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {orderRows.map((row) => {
-                      const rowTotal = row.quantity * row.unitPrice;
-                      const hasStockIssue = row.productId && row.quantity > row.availableStock;
-                      return (
-                        <div
-                          key={row.id}
-                          className={`grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 md:grid-cols-[2.2fr_0.8fr_0.8fr_0.9fr_auto] ${
-                            row.removing ? "order-item-exit" : "order-item-enter"
-                          }`}
-                        >
-                          <div>
-                            <label className="mb-1 block text-xs text-slate-400">Product</label>
-                            <select
-                              value={row.productId}
-                              onChange={(e) => handleProductSelect(row.id, e.target.value)}
-                              className="w-full rounded-lg border border-white/15 bg-[#0f141d] px-2 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400/70"
-                            >
-                              <option value="">Select product</option>
-                              {products.map((product) => (
-                                <option key={product._id} value={product._id}>
-                                  {product.name} ({product.stockQuantity} in stock)
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="mb-1 block text-xs text-slate-400">Quantity</label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={row.quantity}
-                              onChange={(e) => handleQuantityChange(row.id, e.target.value)}
-                              className="w-full rounded-lg border border-white/15 bg-[#0f141d] px-2 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400/70"
-                            />
-                            {hasStockIssue ? (
-                              <p className="mt-1 text-[11px] font-semibold text-amber-300">
-                                ⚠️ Only {row.availableStock} available
-                              </p>
-                            ) : null}
-                          </div>
-
-                          <div>
-                            <label className="mb-1 block text-xs text-slate-400">Unit Price</label>
-                            <div className="rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-sm text-slate-200">
-                              {currency.format(row.unitPrice || 0)}
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="mb-1 block text-xs text-slate-400">Row Total</label>
-                            <div className="rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-sm font-semibold text-slate-100">
-                              {currency.format(rowTotal || 0)}
-                            </div>
-                          </div>
-
-                          <div className="flex items-end justify-end">
-                            <button
-                              type="button"
-                              onClick={() => removeRow(row.id)}
-                              className="rounded-lg border border-red-400/40 bg-red-500/15 p-2 text-red-300 hover:bg-red-500/25"
-                              aria-label="Remove row"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                <section className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-300">
-                    Order Summary
-                  </h3>
-                  <div className="flex items-center justify-between text-sm text-slate-300">
-                    <span>Subtotal</span>
-                    <span>{currency.format(createSubtotal)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2">
-                    <span className="text-sm text-slate-300">Total Price</span>
-                    <span className="text-xl font-bold text-white">
-                      {currency.format(createSubtotal)}
-                    </span>
-                  </div>
-                </section>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreateOpen(false);
-                    resetCreateForm();
-                  }}
-                  className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-sm text-slate-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={placeOrder}
-                  disabled={placing}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  <ShoppingCart className="h-4 w-4" />
-                  {placing ? "Placing..." : "Place Order"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {detailOpen && selectedOrder ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="product-modal-drop w-full max-w-3xl rounded-2xl border border-white/15 bg-[#101722] shadow-[0_24px_50px_rgba(0,0,0,0.55)]">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Order Details</h2>
-                <p className="text-xs text-slate-400">
-                  {orderNumber(selectedOrder._id)} • {selectedOrder.customerName || "Walk-in Customer"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setDetailOpen(false);
-                  setSelectedOrder(null);
-                }}
-                className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-5 px-5 py-5">
-              <section>
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-300">
-                  Items
-                </h3>
-                <div className="space-y-2">
-                  {(selectedOrder.items || []).map((item, idx) => (
-                    <div
-                      key={`${itemProductName(item)}-${idx}`}
-                      className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm"
-                    >
-                      <span className="text-slate-200">{itemProductName(item)}</span>
-                      <span className="text-slate-300">
-                        {item.quantity} x {currency.format(item.unitPrice || 0)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-300">
-                  Timeline
-                </h3>
-                <div className="grid grid-cols-4 gap-2">
-                  {STATUS_STEPS.map((step, idx) => {
-                    const current = normalizeStatus(selectedOrder.status);
-                    const currentIndex = STATUS_STEPS.indexOf(current);
-                    const active = current !== "cancelled" && idx <= currentIndex;
-                    return (
-                      <div key={step} className="text-center">
-                        <div
-                          className={`mx-auto h-3 w-3 rounded-full ${
-                            active ? "bg-indigo-400" : "bg-slate-600"
-                          }`}
-                        />
-                        <p className="mt-1 text-[11px] capitalize text-slate-300">{step}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-                {normalizeStatus(selectedOrder.status) === "cancelled" ? (
-                  <p className="mt-2 text-xs font-semibold text-red-300">
-                    Order cancelled
-                  </p>
-                ) : null}
-              </section>
-
-              <section className="rounded-xl border border-white/10 bg-black/20 p-4">
-                <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-300">
-                      Update Status
-                    </label>
-                    <select
-                      value={nextStatus}
-                      onChange={(e) => setNextStatus(e.target.value as OrderStatus)}
-                      disabled={normalizeStatus(selectedOrder.status) === "cancelled"}
-                      className="w-full rounded-xl border border-white/15 bg-[#0f141d] px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400/70 disabled:opacity-50"
-                    >
-                      {(() => {
-                        const current = normalizeStatus(selectedOrder.status);
-                        const options =
-                          current === "cancelled"
-                            ? []
-                            : STATUS_STEPS.slice(STATUS_STEPS.indexOf(current));
-                        return options.map((status) => (
-                          <option key={status} value={status}>
-                            {statusText(status)}
-                          </option>
-                        ));
-                      })()}
-                    </select>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleStatusUpdate}
-                    disabled={
-                      updating || normalizeStatus(selectedOrder.status) === "cancelled"
-                    }
-                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    {updating ? "Updating..." : "Save Status"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => cancelOrder(selectedOrder, true)}
-                    disabled={!canCancel(selectedOrder.status)}
-                    className="rounded-xl border border-red-400/45 bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 disabled:opacity-40"
-                  >
-                    Cancel Order
-                  </button>
-                </div>
-              </section>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <OrderDetailModal
+        open={detailOpen}
+        selectedOrder={selectedOrder}
+        nextStatus={nextStatus}
+        updating={updating}
+        currencyFormatter={currency}
+        onClose={() => {
+          setDetailOpen(false);
+          setSelectedOrder(null);
+        }}
+        onNextStatusChange={setNextStatus}
+        onSaveStatus={handleStatusUpdate}
+        onCancelOrder={cancelOrder}
+      />
     </div>
   );
 }
